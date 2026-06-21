@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grade 7 Math Handouts</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0284c7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js');
+        });
+      }
+    </script>
+
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Icons ---
+        const ChevronLeft = ({ size = 24 }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>);
+        const ChevronRight = ({ size = 24 }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>);
+        const Menu = ({ size = 24 }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>);
+        const X = ({ size = 24 }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>);
+        const Loader = ({ size = 24, className = "" }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>);
+        const Share = ({ size = 24 }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>);
+
+        const MathHandoutsApp = () => {
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [menuOpen, setMenuOpen] = useState(false);
+            const [handouts, setHandouts] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            const [selectedTerm, setSelectedTerm] = useState(null); 
+            const [showCopyNotif, setShowCopyNotif] = useState(false);
+            
+            const isInitialMount = useRef(true);
+
+            // TODO: Update this URL with your Grade 7 Google Sheets Published URL if different
+            const BASE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSKokexxJE7NAJWhovLtTQHszKtFAgTZ7Cw-IczbSU-1mrOnYEtJxtSkpI5mGQ9-wAUeU1j8_0Pes2W/pub";
+            const terms = ['Term-1', 'Term-2', 'Term-3'];
+
+            const createSlug = (title) => {
+                return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            };
+
+            const parseURL = () => {
+                const hash = window.location.hash.slice(1);
+                if (hash) {
+                    // Matches formats like #term-1-0-lesson-slug
+                    const match = hash.match(/^(term-\d)-(\d+)-/i);
+                    if (match) {
+                        // Normalize back to case-sensitive match array values
+                        const normalizedTerm = terms.find(t => t.toLowerCase() === match[1].toLowerCase());
+                        return { term: normalizedTerm || 'Term-1', index: parseInt(match[2]) };
+                    }
+                }
+                return null;
+            };
+
+            const updateURL = (term, index) => {
+                if (handouts[index]) {
+                    const slug = createSlug(handouts[index].title);
+                    const newHash = `#${term.toLowerCase()}-${index}-${slug}`;
+                    if (window.location.hash !== newHash) {
+                        window.history.replaceState(null, null, newHash);
+                    }
+                }
+            };
+
+            useEffect(() => {
+                const urlData = parseURL();
+                const initialTerm = (urlData && terms.includes(urlData.term)) ? urlData.term : 'Term-1';
+                setSelectedTerm(initialTerm);
+                fetchHandouts(initialTerm, urlData);
+
+                const handleHashChange = () => {
+                    const data = parseURL();
+                    if (data) {
+                        if (data.term !== selectedTerm) setSelectedTerm(data.term);
+                        else setCurrentIndex(data.index);
+                    }
+                };
+
+                window.addEventListener('hashchange', handleHashChange);
+                return () => window.removeEventListener('hashchange', handleHashChange);
+            }, []);
+
+            useEffect(() => {
+                if (isInitialMount.current) isInitialMount.current = false;
+                else if (selectedTerm) fetchHandouts(selectedTerm);
+            }, [selectedTerm]);
+
+            useEffect(() => {
+                if (handouts.length > 0 && !loading && selectedTerm) {
+                    updateURL(selectedTerm, currentIndex);
+                }
+            }, [currentIndex, selectedTerm, handouts, loading]);
+
+            const fetchHandouts = async (term, urlData = null) => {
+                try {
+                    setLoading(true);
+                    setError(null);
+                    const sheetUrl = `${BASE_SHEET_URL}?gid=${getGidForTerm(term)}&single=true&output=csv`;
+                    
+                    const response = await fetch(sheetUrl);
+                    if (!response.ok) throw new Error("Could not connect to the data source.");
+                    
+                    const csvText = await response.text();
+                    const rows = csvText.split('\n').filter(row => row.trim());
+                    const data = [];
+                    
+                    for (let i = 1; i < rows.length; i++) {
+                        const row = rows[i].trim();
+                        const match = row.match(/^"([^"]*)","([^"]*)"$/) || row.match(/^([^,]*),(.*)$/);
+                        if (match) {
+                            const title = match[1].trim();
+                            const rawUrls = match[2].trim();
+                            const imageUrls = rawUrls.split(',').map(url => url.trim().replace(/^"|"$/g, ''));
+                            
+                            data.push({ title, imageUrls });
+                        }
+                    }
+                    
+                    setHandouts(data);
+                    const targetData = urlData || parseURL();
+                    if (targetData && targetData.term === term && targetData.index < data.length) {
+                        setCurrentIndex(targetData.index);
+                    } else {
+                        setCurrentIndex(0);
+                    }
+                    setLoading(false);
+                } catch (err) {
+                    setError("Failed to load handouts. Please check your internet connection.");
+                    setLoading(false);
+                }
+            };
+
+            // TODO: Populate these keys with your corresponding Grade 7 sheet tab GIDs
+            const getGidForTerm = (t) => {
+                const gidMap = { 
+                    'Term-1': '1537771396',          // Place your Term 1 Sheet Tab GID here
+                    'Term-2': '341159409',  // Place your Term 2 Sheet Tab GID here
+                    'Term-3': '1458047145'   // Place your Term 3 Sheet Tab GID here
+                };
+                return gidMap[t] || '0';
+            };
+
+            const changeTerm = (t) => {
+                if (t !== selectedTerm) {
+                    setMenuOpen(false);
+                    setSelectedTerm(t);
+                }
+            };
+
+            const copyCurrentURL = () => {
+                navigator.clipboard.writeText(window.location.href).then(() => {
+                    setShowCopyNotif(true);
+                    setTimeout(() => setShowCopyNotif(false), 2000);
+                });
+            };
+
+            if (loading || !selectedTerm) {
+                return (
+                    <div className="min-h-screen bg-sky-50 flex items-center justify-center">
+                        <Loader size={48} className="animate-spin text-sky-600" />
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
+                    {showCopyNotif && (
+                        <div className="fixed top-4 right-4 bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-2xl z-50 animate-fade-in font-bold">
+                            Link copied to clipboard!
+                        </div>
+                    )}
+
+                    <header className="bg-sky-600 text-white shadow-lg sticky top-0 z-30">
+                        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+                            <h1 className="text-xl md:text-2xl font-black tracking-tight">Grade 7 Math Handouts</h1>
+                            <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 hover:bg-sky-700 rounded-lg lg:hidden transition-colors">
+                                {menuOpen ? <X size={24} /> : <Menu size={24} />}
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="flex-1 flex overflow-hidden">
+                        {/* Sidebar */}
+                        <aside className={`${menuOpen ? 'translate-x-0' : '-translate-x-full'} fixed lg:relative lg:translate-x-0 z-20 w-80 bg-white border-r border-slate-200 shadow-xl lg:shadow-none transition-transform duration-300 h-full overflow-y-auto`}>
+                            <div className="p-5">
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Academic Terms</h2>
+                                <div className="grid grid-cols-3 gap-1.5 mb-8">
+                                    {terms.map((t) => (
+                                        <button key={t} onClick={() => changeTerm(t)} className={`py-2 px-1 rounded-lg font-bold text-xs text-center transition-all ${selectedTerm === t ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                                            {t.replace('-', ' ')}
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Lessons</h2>
+                                <nav className="space-y-1">
+                                    {handouts.length > 0 ? (
+                                        handouts.map((h, i) => (
+                                            <button key={i} onClick={() => { setCurrentIndex(i); setMenuOpen(false); }} className={`w-full text-left p-3 rounded-xl text-sm transition-all ${currentIndex === i ? 'bg-sky-50 text-sky-700 font-bold border-l-4 border-sky-600' : 'hover:bg-slate-50 text-slate-600'}`}>
+                                                {h.title}
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <p className="text-sm text-slate-400 italic p-3">No lessons found for this term.</p>
+                                    )}
+                                </nav>
+                            </div>
+                        </aside>
+
+                        {/* Main Content */}
+                        <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50">
+                            <div className="max-w-3xl mx-auto">
+                                {error ? (
+                                    <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-center font-medium">
+                                        {error}
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                            <div>
+                                                <span className="bg-sky-100 text-sky-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">{selectedTerm.replace('-', ' ')}</span>
+                                                <h2 className="text-xl md:text-2xl font-extrabold text-slate-800 mt-1">{handouts[currentIndex]?.title || "Loading Lesson..."}</h2>
+                                            </div>
+                                            <button onClick={copyCurrentURL} disabled={handouts.length === 0} className="flex items-center gap-2 text-sky-600 hover:bg-sky-50 disabled:opacity-50 px-4 py-2 rounded-xl transition-all font-bold text-sm border border-sky-100">
+                                                <Share size={18} /> Share Link
+                                            </button>
+                                        </div>
+
+                                        {/* Multi-Image Rendering */}
+                                        <div className="space-y-4 mb-8">
+                                            {handouts[currentIndex]?.imageUrls.map((url, idx) => (
+                                                <div key={idx} className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                                                    <img 
+                                                        src={url} 
+                                                        alt={`${handouts[currentIndex]?.title} - Part ${idx + 1}`} 
+                                                        className="w-full h-auto block" 
+                                                        loading="lazy"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Controls */}
+                                        <div className="flex items-center justify-between bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sticky bottom-0">
+                                            <button 
+                                                onClick={() => currentIndex > 0 && setCurrentIndex(currentIndex - 1)} 
+                                                disabled={currentIndex === 0} 
+                                                className="flex items-center gap-2 px-4 md:px-6 py-3 rounded-xl font-bold bg-sky-600 text-white disabled:bg-slate-100 disabled:text-slate-400 transition-all active:scale-95"
+                                            >
+                                                <ChevronLeft size={20} /> <span className="hidden md:inline">Previous</span>
+                                            </button>
+                                            
+                                            <span className="text-slate-500 font-bold tabular-nums">
+                                                {handouts.length > 0 ? currentIndex + 1 : 0} <span className="text-slate-300 mx-1">/</span> {handouts.length}
+                                            </span>
+
+                                            <button 
+                                                onClick={() => currentIndex < handouts.length - 1 && setCurrentIndex(currentIndex + 1)} 
+                                                disabled={handouts.length === 0 || currentIndex === handouts.length - 1} 
+                                                className="flex items-center gap-2 px-4 md:px-6 py-3 rounded-xl font-bold bg-sky-600 text-white disabled:bg-slate-100 disabled:text-slate-400 transition-all active:scale-95"
+                                            >
+                                                <span className="hidden md:inline">Next</span> <ChevronRight size={20} />
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </main>
+                    </div>
+
+                    {menuOpen && <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-10 lg:hidden" onClick={() => setMenuOpen(false)} />}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MathHandoutsApp />);
+    </script>
+</body>
+</html>
